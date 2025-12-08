@@ -4,25 +4,32 @@ import com.example.battleship.exceptions.InvalidShipPlacementException;
 import com.example.battleship.model.Board;
 import com.example.battleship.model.Coordinate;
 import com.example.battleship.model.Ship;
+import com.example.battleship.patterns.GameObserver;
 import com.example.battleship.util.ArchivoUtil;
+import com.example.battleship.view.CellRenderer;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.Rectangle;
 
 import java.net.URL;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ResourceBundle;
 
-public class ViewController implements Initializable {
+/**
+ * View controller for the Battleship game interface.
+ * Handles user interactions, UI updates, and implements GameObserver.
+ *
+ * @author Battleship Team
+ * @version 1.0
+ * @since 2025-12-07
+ */
+public class ViewController implements Initializable, GameObserver {
 
     @FXML private GridPane playerGrid;
     @FXML private GridPane machineGrid;
@@ -33,7 +40,7 @@ public class ViewController implements Initializable {
 
     private GameController gameController;
     private boolean isHorizontalPlacement = true;
-    private boolean isGameStarted = false; // Estado importante
+    private boolean isGameStarted = false;
 
     private final int CELL_SIZE = 30;
 
@@ -41,11 +48,14 @@ public class ViewController implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         gameController = new GameController();
 
-        // Inicializar cuadrículas visuales primero
+        // Register this controller as observer
+        gameController.addObserver(this);
+
+        // Initialize grids
         initializeGrid(playerGrid, true);
         initializeGrid(machineGrid, false);
 
-        // Configurar callback de la IA
+        // Set callback for machine turn
         gameController.setOnMachineTurnFinished(() -> {
             refreshBoard(playerGrid, gameController.getPlayerBoard(), false);
             refreshBoard(machineGrid, gameController.getMachineBoard(), true);
@@ -53,50 +63,74 @@ public class ViewController implements Initializable {
             checkGameOver();
         });
 
-        // -------------------------------------------------------------
-        // LOGICA DE PREGUNTA AL INICIAR (HU-5)
-        // -------------------------------------------------------------
-        // Verificamos si existe archivo sin cargarlo aún
+        // Check for saved game
         if (ArchivoUtil.loadGame() != null) {
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setTitle("Partida Guardada");
-            alert.setHeaderText("Se ha encontrado una partida guardada.");
-            alert.setContentText("¿Quieres seguir con esa o empezar una nueva?");
+            alert.setTitle("Saved Game Found");
+            alert.setHeaderText("A saved game was found.");
+            alert.setContentText("Do you want to continue or start a new game?");
 
-            ButtonType buttonTypeContinue = new ButtonType("Seguir con esa");
-            ButtonType buttonTypeNew = new ButtonType("Empezar Nueva");
+            ButtonType buttonTypeContinue = new ButtonType("Continue");
+            ButtonType buttonTypeNew = new ButtonType("New Game");
             alert.getButtonTypes().setAll(buttonTypeContinue, buttonTypeNew);
 
             Optional<ButtonType> result = alert.showAndWait();
 
             if (result.isPresent() && result.get() == buttonTypeContinue) {
-                // Opción 1: Cargar partida
                 boolean success = gameController.loadGameFromSave();
                 if (success) {
-                    isGameStarted = true; // IMPORTANTÍSIMO: Desbloquea los disparos
+                    isGameStarted = true;
                     btnStart.setDisable(true);
                     btnRotate.setDisable(true);
-                    lblStatus.setText("Partida Reanudada. ¡Dispara!");
+                    lblStatus.setText("Game Resumed. Fire away!");
                     log("Game loaded successfully. Resume battle!");
 
-                    // Repintar tableros con el estado cargado
                     refreshBoard(playerGrid, gameController.getPlayerBoard(), false);
                     refreshBoard(machineGrid, gameController.getMachineBoard(), true);
                 }
             } else {
-                // Opción 2: Nueva partida
                 gameController.resetGame();
-                isGameStarted = false; // Modo colocación
+                isGameStarted = false;
                 log("New game started. Place your fleet.");
                 lblStatus.setText("Place: Carrier (4 cells)");
             }
         } else {
-            // No hay partida guardada, flujo normal
             log("Welcome Admiral! Place your ships.");
             lblStatus.setText("Place: Carrier (4 cells)");
         }
+
+        // Setup keyboard events (after scene is available)
+        Platform.runLater(() -> setupKeyboardEvents());
     }
 
+    /**
+     * Sets up keyboard event handlers.
+     */
+    private void setupKeyboardEvents() {
+        if (playerGrid.getScene() != null) {
+            playerGrid.getScene().setOnKeyPressed(event -> {
+                if (event.getCode() == KeyCode.R) {
+                    handleRotate();
+                    event.consume();
+                } else if (event.getCode() == KeyCode.SPACE) {
+                    if (!btnStart.isDisable()) {
+                        handleStartGame();
+                    }
+                    event.consume();
+                } else if (event.getCode() == KeyCode.ESCAPE) {
+                    // Could implement pause menu here
+                    log("ESC pressed - Pause menu not implemented");
+                }
+            });
+        }
+    }
+
+    /**
+     * Initializes a grid with cells and event handlers.
+     *
+     * @param grid The GridPane to initialize
+     * @param isPlayer true if player grid, false if machine grid
+     */
     private void initializeGrid(GridPane grid, boolean isPlayer) {
         for (int row = 0; row < 10; row++) {
             for (int col = 0; col < 10; col++) {
@@ -117,12 +151,19 @@ public class ViewController implements Initializable {
         }
     }
 
+    /**
+     * Handles rotation button click.
+     */
     @FXML
     private void handleRotate() {
         isHorizontalPlacement = !isHorizontalPlacement;
         btnRotate.setText("Rotate Ship (" + (isHorizontalPlacement ? "Horizontal" : "Vertical") + ")");
+        log("Ship orientation: " + (isHorizontalPlacement ? "Horizontal" : "Vertical"));
     }
 
+    /**
+     * Handles start game button click.
+     */
     @FXML
     private void handleStartGame() {
         if (gameController.getNextShipToPlace() != null) {
@@ -140,8 +181,14 @@ public class ViewController implements Initializable {
         refreshBoard(machineGrid, gameController.getMachineBoard(), true);
     }
 
+    /**
+     * Handles click on player grid (ship placement).
+     *
+     * @param row The row clicked
+     * @param col The column clicked
+     */
     private void handlePlayerGridClick(int row, int col) {
-        if (isGameStarted) return; // Si ya empezó, no deja poner barcos
+        if (isGameStarted) return;
 
         Ship currentShip = gameController.getNextShipToPlace();
         if (currentShip == null) return;
@@ -152,11 +199,11 @@ public class ViewController implements Initializable {
 
             Ship next = gameController.getNextShipToPlace();
             if (next == null) {
-                lblStatus.setText("Fleet Ready. Press START.");
+                lblStatus.setText("Fleet Ready. Press START (or Space).");
                 btnStart.setDisable(false);
-                log("All ships placed.");
+                log("All ships placed. Ready for battle!");
             } else {
-                lblStatus.setText("Place: " + next.getType() + " (" + next.getSize() + ")");
+                lblStatus.setText("Place: " + next.getType() + " (" + next.getSize() + " cells)");
             }
 
         } catch (InvalidShipPlacementException e) {
@@ -164,14 +211,18 @@ public class ViewController implements Initializable {
         }
     }
 
+    /**
+     * Handles click on machine grid (shooting).
+     *
+     * @param row The row clicked
+     * @param col The column clicked
+     */
     private void handleMachineGridClick(int row, int col) {
-        // Bloqueo si no ha empezado el juego
         if (!isGameStarted) {
-            log("Game not started or in placement phase.");
+            log("Game not started. Place ships first!");
             return;
         }
 
-        // Bloqueo si es turno de la máquina
         if (!gameController.isPlayerTurn()) {
             log("Wait! Machine is thinking...");
             return;
@@ -181,8 +232,9 @@ public class ViewController implements Initializable {
 
         refreshBoard(machineGrid, gameController.getMachineBoard(), true);
 
-        if (shotResult) log("HIT! Shoot again.");
-        else {
+        if (shotResult) {
+            log("HIT! Shoot again.");
+        } else {
             log("MISS! Enemy turn.");
             lblStatus.setText("Enemy Turn...");
         }
@@ -190,17 +242,36 @@ public class ViewController implements Initializable {
         checkGameOver();
     }
 
+    /**
+     * Checks if game is over and shows result.
+     */
     private void checkGameOver() {
         if (gameController.isGameOver()) {
             isGameStarted = false;
+
+            boolean playerWon = !gameController.getMachineBoard().getGrid()
+                    .containsValue(Board.CellState.SHIP);
+
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
             alert.setTitle("Game Over");
-            alert.setHeaderText(null);
-            alert.setContentText("The battle has ended!");
+            alert.setHeaderText(playerWon ? "VICTORY!" : "DEFEAT!");
+            alert.setContentText(playerWon ?
+                    "Congratulations! You sank all enemy ships!" :
+                    "Your fleet has been destroyed!");
             alert.show();
+
+            log(playerWon ? "VICTORY! All enemy ships destroyed!" : "DEFEAT! Fleet destroyed!");
         }
     }
 
+    /**
+     * Refreshes the visual representation of a board.
+     * Uses CellRenderer for enhanced 2D graphics.
+     *
+     * @param grid The GridPane to refresh
+     * @param board The board data
+     * @param hideShips Whether to hide ships (for enemy board)
+     */
     private void refreshBoard(GridPane grid, Board board, boolean hideShips) {
         Map<Coordinate, Board.CellState> gridState = board.getGrid();
 
@@ -212,47 +283,60 @@ public class ViewController implements Initializable {
             if (col == null || row == null) continue;
 
             StackPane cell = (StackPane) node;
-            cell.getChildren().clear();
-
             Coordinate coord = new Coordinate(row, col);
             Board.CellState state = gridState.getOrDefault(coord, Board.CellState.WATER);
 
-            switch (state) {
-                case SHIP:
-                    if (!hideShips) {
-                        Rectangle ship = new Rectangle(CELL_SIZE - 4, CELL_SIZE - 4, Color.DARKGRAY);
-                        ship.setArcWidth(10); ship.setArcHeight(10);
-                        cell.getChildren().add(ship);
-                    }
-                    break;
-                case HIT:
-                    Circle fire = new Circle(CELL_SIZE / 3, Color.ORANGERED);
-                    cell.getChildren().add(fire);
-                    if (!hideShips) {
-                        Rectangle brokenShip = new Rectangle(CELL_SIZE - 4, CELL_SIZE - 4, Color.DARKGRAY);
-                        brokenShip.setOpacity(0.5);
-                        cell.getChildren().add(0, brokenShip);
-                    }
-                    break;
-                case SUNK:
-                    Rectangle sunk = new Rectangle(CELL_SIZE - 4, CELL_SIZE - 4, Color.BLACK);
-                    Line x1 = new Line(-10, -10, 10, 10); x1.setStroke(Color.RED);
-                    Line x2 = new Line(10, -10, -10, 10); x2.setStroke(Color.RED);
-                    StackPane sunkGroup = new StackPane(sunk, x1, x2);
-                    cell.getChildren().add(sunkGroup);
-                    break;
-                case MISS:
-                    Line m1 = new Line(-8, -8, 8, 8); m1.setStroke(Color.WHITE); m1.setStrokeWidth(2);
-                    Line m2 = new Line(8, -8, -8, 8); m2.setStroke(Color.WHITE); m2.setStrokeWidth(2);
-                    cell.getChildren().addAll(m1, m2);
-                    break;
-                default: break;
-            }
+            // Use CellRenderer for enhanced 2D graphics
+            CellRenderer.renderCell(cell, state, hideShips);
         }
     }
 
+    /**
+     * Logs a message to the text area.
+     *
+     * @param msg The message to log
+     */
     private void log(String msg) {
         txtLog.appendText("> " + msg + "\n");
         txtLog.setScrollTop(Double.MAX_VALUE);
+    }
+
+    // GameObserver Implementation
+
+    @Override
+    public void onBoardChanged(boolean isPlayerBoard) {
+        Platform.runLater(() -> {
+            if (isPlayerBoard) {
+                refreshBoard(playerGrid, gameController.getPlayerBoard(), false);
+            } else {
+                refreshBoard(machineGrid, gameController.getMachineBoard(), true);
+            }
+        });
+    }
+
+    @Override
+    public void onShotFired(boolean isHit, boolean isSunk) {
+        Platform.runLater(() -> {
+            if (isSunk) {
+                log("SUNK! Enemy ship destroyed!");
+            } else if (isHit) {
+                log("HIT! Part of enemy ship damaged.");
+            }
+        });
+    }
+
+    @Override
+    public void onGameOver(boolean playerWon) {
+        Platform.runLater(() -> {
+            lblStatus.setText(playerWon ? "YOU WIN!" : "YOU LOSE!");
+            checkGameOver();
+        });
+    }
+
+    @Override
+    public void onTurnChanged(boolean isPlayerTurn) {
+        Platform.runLater(() -> {
+            lblStatus.setText(isPlayerTurn ? "Your Turn!" : "Enemy Turn...");
+        });
     }
 }
