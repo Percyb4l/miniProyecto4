@@ -286,8 +286,8 @@ public class ViewController implements Initializable, GameObserver {
             Coordinate coord = new Coordinate(row, col);
             Board.CellState state = gridState.getOrDefault(coord, Board.CellState.WATER);
 
-            // Use CellRenderer for enhanced 2D graphics
-            CellRenderer.renderCell(cell, state, hideShips);
+            Object[] shipInfo = board.getShipRenderInfo(coord);
+            CellRenderer.renderCell(cell, state, hideShips, shipInfo);
         }
     }
 
