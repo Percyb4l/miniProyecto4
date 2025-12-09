@@ -1,6 +1,8 @@
 package com.example.battleship.view;
 
 import com.example.battleship.model.Board;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.effect.InnerShadow;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
@@ -10,23 +12,24 @@ import javafx.scene.paint.Stop;
 import javafx.scene.shape.*;
 
 /**
- * Cell renderer with continuous multi-cell ships (no gaps between cells).
- * Each cell draws its portion extending to cell edges for seamless connection.
+ * Cell renderer with 3D perspective ships and realistic water.
+ * Ships have depth/height appearance with shadows and gradients.
  *
  * @author Battleship Team
- * @version 7.0
+ * @version 8.0
  */
 public class CellRenderer {
 
     private static final int CELL_SIZE = 30;
 
-    // Military olive green palette
-    private static final Color HULL_DARK = Color.rgb(75, 85, 70);
-    private static final Color HULL_MEDIUM = Color.rgb(95, 105, 85);
-    private static final Color HULL_LIGHT = Color.rgb(115, 125, 100);
-    private static final Color OUTLINE = Color.rgb(40, 45, 35);
-    private static final Color DECK_LINES = Color.rgb(60, 70, 55);
-    private static final Color ORANGE_ACCENT = Color.rgb(200, 120, 60);
+    // Realistic military colors with 3D shading
+    private static final Color HULL_TOP = Color.rgb(110, 120, 95);
+    private static final Color HULL_SIDE = Color.rgb(85, 95, 75);
+    private static final Color HULL_SHADOW = Color.rgb(60, 70, 55);
+    private static final Color DECK = Color.rgb(100, 110, 85);
+    private static final Color OUTLINE = Color.rgb(35, 40, 30);
+    private static final Color ORANGE_LIGHT = Color.rgb(220, 140, 70);
+    private static final Color ORANGE_DARK = Color.rgb(180, 100, 50);
 
     public static void renderCell(StackPane cell, Board.CellState state, boolean hideShips,
                                   Object[] shipInfo) {
@@ -34,7 +37,7 @@ public class CellRenderer {
 
         switch (state) {
             case WATER:
-                renderWater(cell);
+                renderRealisticWater(cell);
                 break;
             case SHIP:
                 if (!hideShips && shipInfo != null) {
@@ -43,9 +46,10 @@ public class CellRenderer {
                     int totalSize = (int) shipInfo[2];
                     boolean isHorizontal = (boolean) shipInfo[3];
 
-                    renderShipPart(cell, type, position, totalSize, isHorizontal);
+                    renderRealisticWater(cell);
+                    renderShipPart3D(cell, type, position, totalSize, isHorizontal);
                 } else {
-                    renderWater(cell);
+                    renderRealisticWater(cell);
                 }
                 break;
             case HIT:
@@ -60,549 +64,512 @@ public class CellRenderer {
         }
     }
 
-    private static void renderWater(StackPane cell) {
+    private static void renderRealisticWater(StackPane cell) {
         Rectangle water = new Rectangle(CELL_SIZE, CELL_SIZE);
-        LinearGradient gradient = new LinearGradient(
+
+        LinearGradient oceanGradient = new LinearGradient(
                 0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.rgb(100, 180, 255)),
-                new Stop(0.5, Color.rgb(70, 150, 230)),
-                new Stop(1, Color.rgb(50, 120, 200))
+                new Stop(0, Color.rgb(30, 80, 120)),
+                new Stop(0.3, Color.rgb(40, 100, 140)),
+                new Stop(0.6, Color.rgb(50, 120, 160)),
+                new Stop(1, Color.rgb(65, 140, 180))
         );
-        water.setFill(gradient);
+        water.setFill(oceanGradient);
+
+        InnerShadow depth = new InnerShadow();
+        depth.setColor(Color.rgb(20, 60, 90, 0.4));
+        depth.setRadius(5);
+        water.setEffect(depth);
+
         cell.getChildren().add(water);
+
+        Path wave = new Path();
+        wave.getElements().addAll(
+                new MoveTo(0, CELL_SIZE * 0.3),
+                new QuadCurveTo(CELL_SIZE * 0.3, CELL_SIZE * 0.25, CELL_SIZE * 0.5, CELL_SIZE * 0.3),
+                new QuadCurveTo(CELL_SIZE * 0.7, CELL_SIZE * 0.35, CELL_SIZE, CELL_SIZE * 0.3)
+        );
+        wave.setStroke(Color.rgb(200, 230, 255, 0.2));
+        wave.setStrokeWidth(1);
+        cell.getChildren().add(wave);
     }
 
-    private static void renderShipPart(StackPane cell, String type, int position,
-                                       int totalSize, boolean isHorizontal) {
+    private static void renderShipPart3D(StackPane cell, String type, int position,
+                                         int totalSize, boolean isHorizontal) {
         if (!isHorizontal) {
             cell.setRotate(90);
         }
 
         switch (type) {
             case "Carrier":
-                renderCarrierPart(cell, position, totalSize);
+                renderCarrier3D(cell, position, totalSize);
                 break;
             case "Submarine":
-                renderSubmarinePart(cell, position, totalSize);
+                renderSubmarine3D(cell, position, totalSize);
                 break;
             case "Destroyer":
-                renderDestroyerPart(cell, position, totalSize);
+                renderDestroyer3D(cell, position, totalSize);
                 break;
             case "Frigate":
-                renderFrigatePart(cell);
+                renderFrigate3D(cell);
                 break;
         }
     }
 
-    /**
-     * CARRIER (4 cells) - Continuous aircraft carrier.
-     */
-    private static void renderCarrierPart(StackPane cell, int position, int totalSize) {
+    private static void renderCarrier3D(StackPane cell, int position, int totalSize) {
         if (position == 0) {
-            // BOW - Pointed front
+            Polygon hullBottom = new Polygon(
+                    -15, 2, -15, 11, 15, 11, 15, 2
+            );
+            hullBottom.setFill(HULL_SHADOW);
+            hullBottom.setStroke(OUTLINE);
+            hullBottom.setStrokeWidth(1.5);
+
+            Polygon deckTop = new Polygon(
+                    -15, -11, 15, -11, 15, 2, -15, 2
+            );
+            deckTop.setFill(HULL_TOP);
+            deckTop.setStroke(OUTLINE);
+            deckTop.setStrokeWidth(1.5);
+
             Polygon bow = new Polygon(
-                    -15, 0,          // Sharp point
-                    -15, -11,
-                    15, -11,         // Extends to next cell
-                    15, 11,
-                    -15, 11
+                    -18, 2, -18, -8, -15, -11, -15, 11, -18, 8
             );
-            bow.setFill(HULL_MEDIUM);
+            bow.setFill(HULL_SIDE);
             bow.setStroke(OUTLINE);
-            bow.setStrokeWidth(2);
+            bow.setStrokeWidth(1.5);
 
-            // Orange stripe
-            Polygon stripe = new Polygon(
-                    -14, -10,
-                    14, -10,
-                    14, 10,
-                    -14, 10
-            );
-            stripe.setFill(ORANGE_ACCENT);
-            stripe.setStroke(OUTLINE);
-            stripe.setStrokeWidth(1);
+            Rectangle orangeTop = new Rectangle(28, 3);
+            orangeTop.setFill(ORANGE_LIGHT);
+            orangeTop.setStroke(OUTLINE);
+            orangeTop.setTranslateY(-8);
 
-            cell.getChildren().addAll(bow, stripe);
+            Rectangle orangeSide = new Rectangle(28, 2);
+            orangeSide.setFill(ORANGE_DARK);
+            orangeSide.setStroke(OUTLINE);
+            orangeSide.setTranslateY(-5.5);
 
-        } else if (position == 1) {
-            // SECTION 1 - Flight deck with first jet
-            Rectangle deck = new Rectangle(CELL_SIZE, 22);
-            deck.setFill(HULL_LIGHT);
-            deck.setStroke(OUTLINE);
-            deck.setStrokeWidth(2);
-            cell.getChildren().add(deck);
+            DropShadow shadow = new DropShadow();
+            shadow.setRadius(3);
+            shadow.setColor(Color.rgb(0, 0, 0, 0.4));
+            shadow.setOffsetY(2);
+            deckTop.setEffect(shadow);
 
-            // Deck lines (continuous)
-            for (int i = -10; i <= 10; i += 4) {
+            cell.getChildren().addAll(hullBottom, bow, deckTop, orangeSide, orangeTop);
+
+        } else if (position == 1 || position == 2) {
+            Rectangle bottom = new Rectangle(CELL_SIZE, 5);
+            bottom.setFill(HULL_SHADOW);
+            bottom.setStroke(OUTLINE);
+            bottom.setTranslateY(8);
+
+            Rectangle top = new Rectangle(CELL_SIZE, 20);
+            top.setFill(DECK);
+            top.setStroke(OUTLINE);
+            top.setStrokeWidth(1.5);
+            top.setTranslateY(-2);
+
+            for (int i = -10; i <= 8; i += 4) {
                 Line line = new Line(-15, i, 15, i);
-                line.setStroke(DECK_LINES);
-                line.setStrokeWidth(0.6);
+                line.setStroke(Color.rgb(80, 90, 70, 0.6));
+                line.setStrokeWidth(0.7);
                 cell.getChildren().add(line);
             }
 
-            // First jet
-            renderJet(cell, -8, -6);
-
-            // Side extensions
-            Rectangle sideL1 = new Rectangle(5, 6);
-            sideL1.setFill(HULL_DARK);
-            sideL1.setStroke(OUTLINE);
-            sideL1.setTranslateX(-12);
-            sideL1.setTranslateY(-10);
-
-            Rectangle sideL2 = new Rectangle(5, 6);
-            sideL2.setFill(HULL_DARK);
-            sideL2.setStroke(OUTLINE);
-            sideL2.setTranslateX(-12);
-            sideL2.setTranslateY(10);
-
-            cell.getChildren().addAll(sideL1, sideL2);
-
-        } else if (position == 2) {
-            // SECTION 2 - Flight deck with second jet
-            Rectangle deck = new Rectangle(CELL_SIZE, 22);
-            deck.setFill(HULL_LIGHT);
-            deck.setStroke(OUTLINE);
-            deck.setStrokeWidth(2);
-            cell.getChildren().add(deck);
-
-            // Deck lines
-            for (int i = -10; i <= 10; i += 4) {
-                Line line = new Line(-15, i, 15, i);
-                line.setStroke(DECK_LINES);
-                line.setStrokeWidth(0.6);
-                cell.getChildren().add(line);
+            if (position == 1) {
+                render3DJet(cell, -8, -5);
+            } else {
+                render3DJet(cell, -8, 3);
             }
 
-            // Second jet
-            renderJet(cell, -8, 5);
+            Rectangle sideL = new Rectangle(5, 6);
+            sideL.setFill(HULL_SIDE);
+            sideL.setStroke(OUTLINE);
+            sideL.setTranslateX(-12);
+            sideL.setTranslateY(-9);
 
-            // Center line markings
-            Line centerLine = new Line(-15, 0, 15, 0);
-            centerLine.setStroke(Color.YELLOW);
-            centerLine.setStrokeWidth(1.5);
-            centerLine.getStrokeDashArray().addAll(4d, 4d);
-            cell.getChildren().add(centerLine);
+            Rectangle sideLTop = new Rectangle(5, 2);
+            sideLTop.setFill(HULL_TOP);
+            sideLTop.setStroke(OUTLINE);
+            sideLTop.setTranslateX(-12);
+            sideLTop.setTranslateY(-12);
+
+            DropShadow deckShadow = new DropShadow();
+            deckShadow.setRadius(2);
+            deckShadow.setColor(Color.rgb(0, 0, 0, 0.3));
+            deckShadow.setOffsetY(1);
+            top.setEffect(deckShadow);
+
+            cell.getChildren().addAll(bottom, top, sideL, sideLTop);
 
         } else {
-            // STERN - Control tower
-            Rectangle deck = new Rectangle(CELL_SIZE, 22);
-            deck.setFill(HULL_LIGHT);
+            Rectangle bottom = new Rectangle(CELL_SIZE, 5);
+            bottom.setFill(HULL_SHADOW);
+            bottom.setStroke(OUTLINE);
+            bottom.setTranslateY(8);
+
+            Rectangle deck = new Rectangle(CELL_SIZE, 20);
+            deck.setFill(DECK);
             deck.setStroke(OUTLINE);
-            deck.setStrokeWidth(2);
-            cell.getChildren().add(deck);
+            deck.setStrokeWidth(1.5);
+            deck.setTranslateY(-2);
 
-            // Large tower
-            Rectangle tower = new Rectangle(14, 20);
-            tower.setFill(HULL_DARK);
-            tower.setStroke(OUTLINE);
-            tower.setStrokeWidth(1.5);
-            tower.setTranslateX(3);
+            Rectangle towerSide = new Rectangle(3, 20);
+            towerSide.setFill(HULL_SHADOW);
+            towerSide.setStroke(OUTLINE);
+            towerSide.setTranslateX(11);
 
-            // Windows
+            Rectangle towerFront = new Rectangle(12, 20);
+            towerFront.setFill(HULL_SIDE);
+            towerFront.setStroke(OUTLINE);
+            towerFront.setStrokeWidth(1.5);
+            towerFront.setTranslateX(4);
+
+            Rectangle towerTop = new Rectangle(14, 3);
+            towerTop.setFill(HULL_TOP);
+            towerTop.setStroke(OUTLINE);
+            towerTop.setTranslateX(3);
+            towerTop.setTranslateY(-12);
+
             Rectangle win1 = new Rectangle(3, 2.5);
-            win1.setFill(Color.rgb(50, 60, 70));
+            win1.setFill(Color.rgb(40, 50, 60));
+            win1.setStroke(OUTLINE);
             win1.setTranslateX(1);
-            win1.setTranslateY(-5);
+            win1.setTranslateY(-6);
 
             Rectangle win2 = new Rectangle(3, 2.5);
-            win2.setFill(Color.rgb(50, 60, 70));
-            win2.setTranslateX(5);
-            win2.setTranslateY(-5);
+            win2.setFill(Color.rgb(40, 50, 60));
+            win2.setStroke(OUTLINE);
+            win2.setTranslateX(6);
+            win2.setTranslateY(-6);
 
-            // Radar domes
-            Circle radar1 = new Circle(2.5, Color.rgb(130, 130, 140));
+            Circle radar1 = new Circle(2.5);
+            radar1.setFill(Color.rgb(120, 120, 130));
             radar1.setStroke(OUTLINE);
             radar1.setTranslateX(1);
-            radar1.setTranslateY(-12);
+            radar1.setTranslateY(-14);
 
-            Circle radar2 = new Circle(2.5, Color.rgb(130, 130, 140));
-            radar2.setStroke(OUTLINE);
-            radar2.setTranslateX(5);
-            radar2.setTranslateY(-12);
+            InnerShadow radarShadow = new InnerShadow();
+            radarShadow.setColor(Color.rgb(0, 0, 0, 0.3));
+            radar1.setEffect(radarShadow);
 
-            // Antenna
-            Line antenna = new Line(3, -15, 3, -18);
-            antenna.setStroke(OUTLINE);
-            antenna.setStrokeWidth(1.5);
-
-            // Orange detail
             Rectangle orangeBox = new Rectangle(3, 5);
-            orangeBox.setFill(ORANGE_ACCENT);
-            orangeBox.setTranslateX(9);
+            orangeBox.setFill(ORANGE_LIGHT);
+            orangeBox.setStroke(OUTLINE);
+            orangeBox.setTranslateX(10);
             orangeBox.setTranslateY(7);
 
-            cell.getChildren().addAll(tower, win1, win2, radar1, radar2, antenna, orangeBox);
+            DropShadow towerDropShadow = new DropShadow();
+            towerDropShadow.setRadius(3);
+            towerDropShadow.setColor(Color.rgb(0, 0, 0, 0.4));
+            towerFront.setEffect(towerDropShadow);
+
+            cell.getChildren().addAll(bottom, deck, towerSide, towerFront, towerTop,
+                    win1, win2, radar1, orangeBox);
         }
     }
 
-    private static void renderJet(StackPane cell, double x, double y) {
-        // Jet fuselage
-        Polygon jet = new Polygon(
-                x, y,
-                x + 4, y - 2,
-                x + 7, y - 2,
-                x + 8, y,
-                x + 7, y + 2,
-                x + 4, y + 2
+    private static void render3DJet(StackPane cell, double x, double y) {
+        Polygon jetShadow = new Polygon(
+                x, y + 1, x + 5, y - 1, x + 8, y - 1,
+                x + 9, y + 1, x + 8, y + 3, x + 5, y + 3
         );
-        jet.setFill(Color.rgb(90, 90, 100));
+        jetShadow.setFill(Color.rgb(50, 50, 60));
+        jetShadow.setStroke(OUTLINE);
+        jetShadow.setStrokeWidth(0.8);
+
+        Polygon jet = new Polygon(
+                x, y, x + 5, y - 2, x + 8, y - 2,
+                x + 9, y, x + 8, y + 2, x + 5, y + 2
+        );
+        jet.setFill(Color.rgb(80, 80, 90));
         jet.setStroke(OUTLINE);
         jet.setStrokeWidth(1);
 
-        // Wings
         Polygon wings = new Polygon(
-                x + 3, y - 4,
-                x + 5, y - 4,
-                x + 5, y + 4,
-                x + 3, y + 4
+                x + 3, y - 4, x + 5, y - 4, x + 5, y + 4, x + 3, y + 4
         );
-        wings.setFill(Color.rgb(80, 80, 90));
+        wings.setFill(Color.rgb(70, 70, 80));
         wings.setStroke(OUTLINE);
         wings.setStrokeWidth(0.8);
 
-        cell.getChildren().addAll(wings, jet);
+        cell.getChildren().addAll(wings, jetShadow, jet);
     }
 
-    /**
-     * SUBMARINE (3 cells) - Continuous submarine.
-     */
-    private static void renderSubmarinePart(StackPane cell, int position, int totalSize) {
+    private static void renderSubmarine3D(StackPane cell, int position, int totalSize) {
         if (position == 0) {
-            // BOW - Rounded nose
-            Path nose = new Path();
-            nose.getElements().addAll(
-                    new MoveTo(-15, 0),
-                    new QuadCurveTo(-15, -8, -5, -8),
-                    new LineTo(15, -8),
-                    new LineTo(15, 8),
-                    new LineTo(-5, 8),
-                    new QuadCurveTo(-15, 8, -15, 0),
-                    new ClosePath()
-            );
-            nose.setFill(HULL_DARK);
-            nose.setStroke(OUTLINE);
-            nose.setStrokeWidth(2);
+            Ellipse bottom = new Ellipse(12, 5);
+            bottom.setFill(HULL_SHADOW);
+            bottom.setStroke(OUTLINE);
+            bottom.setTranslateY(3);
 
-            // Orange porthole
-            Circle porthole = new Circle(3, ORANGE_ACCENT);
+            Ellipse top = new Ellipse(12, 7);
+            top.setFill(HULL_SIDE);
+            top.setStroke(OUTLINE);
+            top.setStrokeWidth(1.5);
+            top.setTranslateY(-1);
+
+            Ellipse highlight = new Ellipse(10, 3);
+            highlight.setFill(HULL_TOP);
+            highlight.setStroke(OUTLINE);
+            highlight.setTranslateY(-5);
+
+            Circle porthole = new Circle(3);
             porthole.setStroke(OUTLINE);
             porthole.setStrokeWidth(1.2);
             porthole.setTranslateX(-8);
-            porthole.setTranslateY(-6);
+            porthole.setTranslateY(-5);
 
-            // Center line
-            Line centerLine = new Line(-12, 0, 15, 0);
-            centerLine.setStroke(DECK_LINES);
-            centerLine.setStrokeWidth(1.8);
+            RadialGradient glow = new RadialGradient(
+                    0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
+                    new Stop(0, ORANGE_LIGHT),
+                    new Stop(1, ORANGE_DARK)
+            );
+            porthole.setFill(glow);
 
-            cell.getChildren().addAll(nose, centerLine, porthole);
+            cell.getChildren().addAll(bottom, top, highlight, porthole);
 
         } else if (position == 1) {
-            // MIDDLE - Conning tower
-            Rectangle body = new Rectangle(CELL_SIZE, 16);
-            body.setFill(HULL_DARK);
+            Rectangle bottom = new Rectangle(CELL_SIZE, 5);
+            bottom.setFill(HULL_SHADOW);
+            bottom.setStroke(OUTLINE);
+            bottom.setTranslateY(6);
+
+            Rectangle body = new Rectangle(CELL_SIZE, 14);
+            body.setFill(HULL_SIDE);
             body.setStroke(OUTLINE);
-            body.setStrokeWidth(2);
-            cell.getChildren().add(body);
+            body.setStrokeWidth(1.5);
+            body.setTranslateY(-1);
 
-            // Center line continuous
-            Line centerLine = new Line(-15, 0, 15, 0);
-            centerLine.setStroke(DECK_LINES);
-            centerLine.setStrokeWidth(1.8);
-            cell.getChildren().add(centerLine);
+            Rectangle topHighlight = new Rectangle(CELL_SIZE, 4);
+            topHighlight.setFill(HULL_TOP);
+            topHighlight.setStroke(OUTLINE);
+            topHighlight.setTranslateY(-7);
 
-            // Conning tower
-            Rectangle tower = new Rectangle(10, 12);
-            tower.setFill(HULL_MEDIUM);
+            Rectangle towerShadow = new Rectangle(2, 12);
+            towerShadow.setFill(HULL_SHADOW);
+            towerShadow.setTranslateX(6);
+            towerShadow.setTranslateY(-11);
+
+            Rectangle tower = new Rectangle(8, 12);
+            tower.setFill(HULL_SIDE);
             tower.setStroke(OUTLINE);
             tower.setStrokeWidth(1.5);
             tower.setArcWidth(3);
             tower.setArcHeight(3);
-            tower.setTranslateY(-10);
+            tower.setTranslateY(-11);
 
-            // Hatch
-            Circle hatch = new Circle(2.5, HULL_DARK);
-            hatch.setStroke(OUTLINE);
-            hatch.setStrokeWidth(1);
-            hatch.setTranslateY(-10);
+            Rectangle towerTop = new Rectangle(9, 2);
+            towerTop.setFill(HULL_TOP);
+            towerTop.setStroke(OUTLINE);
+            towerTop.setTranslateY(-18);
 
-            // Diving planes (wings)
-            Rectangle wingL = new Rectangle(8, 4);
-            wingL.setFill(HULL_MEDIUM);
-            wingL.setStroke(OUTLINE);
-            wingL.setStrokeWidth(1.2);
-            wingL.setTranslateX(-12);
+            Polygon planeL = new Polygon(
+                    -15, -2, -10, -4, -10, 4, -15, 2
+            );
+            planeL.setFill(HULL_SIDE);
+            planeL.setStroke(OUTLINE);
 
-            Rectangle wingR = new Rectangle(8, 4);
-            wingR.setFill(HULL_MEDIUM);
-            wingR.setStroke(OUTLINE);
-            wingR.setStrokeWidth(1.2);
-            wingR.setTranslateX(12);
-
-            cell.getChildren().addAll(tower, hatch, wingL, wingR);
+            cell.getChildren().addAll(bottom, body, topHighlight, towerShadow, tower, towerTop, planeL);
 
         } else {
-            // STERN - Propeller section
-            Rectangle body = new Rectangle(CELL_SIZE, 16);
-            body.setFill(HULL_DARK);
+            Rectangle bottom = new Rectangle(CELL_SIZE, 5);
+            bottom.setFill(HULL_SHADOW);
+            bottom.setStroke(OUTLINE);
+            bottom.setTranslateY(6);
+
+            Rectangle body = new Rectangle(CELL_SIZE, 14);
+            body.setFill(HULL_SIDE);
             body.setStroke(OUTLINE);
-            body.setStrokeWidth(2);
-            cell.getChildren().add(body);
+            body.setStrokeWidth(1.5);
+            body.setTranslateY(-1);
 
-            // Center line continuous
-            Line centerLine = new Line(-15, 0, 15, 0);
-            centerLine.setStroke(DECK_LINES);
-            centerLine.setStrokeWidth(1.8);
-            cell.getChildren().add(centerLine);
-
-            // Propeller housings (5 circles)
             for (int i = 0; i < 5; i++) {
-                Circle circle = new Circle(3, HULL_MEDIUM);
-                circle.setStroke(OUTLINE);
-                circle.setStrokeWidth(1.2);
-                circle.setTranslateX(-4);
-                circle.setTranslateY(-7 + i * 3.5);
-                cell.getChildren().add(circle);
+                Circle shadow = new Circle(3);
+                shadow.setFill(HULL_SHADOW);
+                shadow.setTranslateX(-3);
+                shadow.setTranslateY(-6 + i * 3.5);
+
+                Circle housing = new Circle(2.8);
+                housing.setFill(HULL_TOP);
+                housing.setStroke(OUTLINE);
+                housing.setStrokeWidth(1);
+                housing.setTranslateX(-4);
+                housing.setTranslateY(-6.5 + i * 3.5);
+
+                cell.getChildren().addAll(shadow, housing);
             }
 
-            // Rear stabilizers
-            Rectangle stabL = new Rectangle(6, 3);
-            stabL.setFill(HULL_MEDIUM);
-            stabL.setStroke(OUTLINE);
-            stabL.setTranslateX(-10);
-            stabL.setTranslateY(-10);
+            Ellipse propShadow = new Ellipse(4, 7);
+            propShadow.setFill(Color.rgb(40, 50, 45));
+            propShadow.setTranslateX(11);
 
-            Rectangle stabR = new Rectangle(6, 3);
-            stabR.setFill(HULL_MEDIUM);
-            stabR.setStroke(OUTLINE);
-            stabR.setTranslateX(-10);
-            stabR.setTranslateY(10);
-
-            // Propeller
             Ellipse prop = new Ellipse(4, 6);
             prop.setFill(Color.rgb(55, 65, 60));
             prop.setStroke(OUTLINE);
             prop.setStrokeWidth(1.5);
             prop.setTranslateX(10);
 
-            cell.getChildren().addAll(stabL, stabR, prop);
+            cell.getChildren().addAll(bottom, body, propShadow, prop);
         }
     }
 
-    /**
-     * DESTROYER (2 cells) - Continuous destroyer.
-     */
-    private static void renderDestroyerPart(StackPane cell, int position, int totalSize) {
-        if (position == 0) {
-            // BOW - Front section
-            Rectangle hull = new Rectangle(CELL_SIZE, 18);
-            hull.setFill(HULL_MEDIUM);
-            hull.setStroke(OUTLINE);
-            hull.setStrokeWidth(2);
-            cell.getChildren().add(hull);
+    private static void renderDestroyer3D(StackPane cell, int position, int totalSize) {
+        Rectangle bottom = new Rectangle(CELL_SIZE, 4);
+        bottom.setFill(HULL_SHADOW);
+        bottom.setStroke(OUTLINE);
+        bottom.setTranslateY(9);
 
-            // Front gun turret (top)
-            Circle gunBase = new Circle(5, HULL_DARK);
-            gunBase.setStroke(OUTLINE);
-            gunBase.setStrokeWidth(1.5);
-            gunBase.setTranslateY(-10);
-
-            Line gunBarrel = new Line(-5, -10, -12, -10);
-            gunBarrel.setStroke(OUTLINE);
-            gunBarrel.setStrokeWidth(2.5);
-
-            // Bridge structure
-            Polygon bridge = new Polygon(
-                    -6, -3,
-                    -6, 3,
-                    -3, 5,
-                    3, 5,
-                    6, 3,
-                    6, -3,
-                    3, -5,
-                    -3, -5
-            );
-            bridge.setFill(HULL_LIGHT);
-            bridge.setStroke(OUTLINE);
-            bridge.setStrokeWidth(1.5);
-
-            // Antenna cross
-            Line antV = new Line(0, -8, 0, -3);
-            antV.setStroke(OUTLINE);
-            antV.setStrokeWidth(1.5);
-
-            Line antH = new Line(-3, -5.5, 3, -5.5);
-            antH.setStroke(OUTLINE);
-            antH.setStrokeWidth(1.5);
-
-            cell.getChildren().addAll(gunBase, gunBarrel, bridge, antV, antH);
-
-        } else {
-            // STERN - Rear section
-            Rectangle hull = new Rectangle(CELL_SIZE, 18);
-            hull.setFill(HULL_MEDIUM);
-            hull.setStroke(OUTLINE);
-            hull.setStrokeWidth(2);
-            cell.getChildren().add(hull);
-
-            // Rear structure boxes
-            Rectangle box1 = new Rectangle(8, 6);
-            box1.setFill(HULL_DARK);
-            box1.setStroke(OUTLINE);
-            box1.setStrokeWidth(1.3);
-            box1.setTranslateY(-7);
-
-            Rectangle box2 = new Rectangle(9, 5);
-            box2.setFill(HULL_LIGHT);
-            box2.setStroke(OUTLINE);
-            box2.setStrokeWidth(1.3);
-            box2.setTranslateY(-1);
-
-            // Bottom hatches
-            Circle hatch1 = new Circle(2.5, HULL_DARK);
-            hatch1.setStroke(OUTLINE);
-            hatch1.setStrokeWidth(1.2);
-            hatch1.setTranslateX(-5);
-            hatch1.setTranslateY(6);
-
-            Circle hatch2 = new Circle(2, HULL_DARK);
-            hatch2.setStroke(OUTLINE);
-            hatch2.setStrokeWidth(1.2);
-            hatch2.setTranslateX(5);
-            hatch2.setTranslateY(6);
-
-            // Rear gun turret
-            Circle rearGun = new Circle(4, HULL_DARK);
-            rearGun.setStroke(OUTLINE);
-            rearGun.setStrokeWidth(1.5);
-            rearGun.setTranslateY(12);
-
-            Line rearBarrel = new Line(0, 12, 0, 17);
-            rearBarrel.setStroke(OUTLINE);
-            rearBarrel.setStrokeWidth(2.5);
-
-            cell.getChildren().addAll(box1, box2, hatch1, hatch2, rearGun, rearBarrel);
-        }
-    }
-
-    /**
-     * FRIGATE (1 cell) - Small patrol boat.
-     */
-    private static void renderFrigatePart(StackPane cell) {
-        // Hull
-        Ellipse hull = new Ellipse(11, 8);
-        hull.setFill(HULL_MEDIUM);
+        Rectangle hull = new Rectangle(CELL_SIZE, 16);
+        hull.setFill(HULL_SIDE);
         hull.setStroke(OUTLINE);
-        hull.setStrokeWidth(2);
-        cell.getChildren().add(hull);
+        hull.setStrokeWidth(1.5);
+        hull.setTranslateY(0);
 
-        // Cabin
-        Rectangle cabin = new Rectangle(8, 8);
-        cabin.setFill(HULL_LIGHT);
+        Rectangle deck = new Rectangle(CELL_SIZE, 3);
+        deck.setFill(HULL_TOP);
+        deck.setStroke(OUTLINE);
+        deck.setTranslateY(-9);
+
+        cell.getChildren().addAll(bottom, hull, deck);
+
+        if (position == 0) {
+            Circle gunShadow = new Circle(5);
+            gunShadow.setFill(HULL_SHADOW);
+            gunShadow.setTranslateY(-9);
+
+            Circle gun = new Circle(4.5);
+            gun.setFill(HULL_TOP);
+            gun.setStroke(OUTLINE);
+            gun.setStrokeWidth(1.5);
+            gun.setTranslateY(-10);
+
+            Line barrel = new Line(-4, -10, -12, -10);
+            barrel.setStroke(OUTLINE);
+            barrel.setStrokeWidth(2.5);
+
+            cell.getChildren().addAll(gunShadow, gun, barrel);
+        } else {
+            Rectangle box = new Rectangle(9, 7);
+            box.setFill(HULL_SIDE);
+            box.setStroke(OUTLINE);
+            box.setTranslateY(-5);
+
+            Rectangle boxTop = new Rectangle(10, 2);
+            boxTop.setFill(HULL_TOP);
+            boxTop.setStroke(OUTLINE);
+            boxTop.setTranslateY(-9);
+
+            cell.getChildren().addAll(box, boxTop);
+        }
+    }
+
+    private static void renderFrigate3D(StackPane cell) {
+        Ellipse bottom = new Ellipse(11, 5);
+        bottom.setFill(HULL_SHADOW);
+        bottom.setTranslateY(3);
+
+        Ellipse hull = new Ellipse(11, 7);
+        hull.setFill(HULL_SIDE);
+        hull.setStroke(OUTLINE);
+        hull.setStrokeWidth(1.5);
+
+        Ellipse top = new Ellipse(9, 3);
+        top.setFill(HULL_TOP);
+        top.setStroke(OUTLINE);
+        top.setTranslateY(-5);
+
+        Rectangle cabin = new Rectangle(8, 7);
+        cabin.setFill(HULL_SIDE);
         cabin.setStroke(OUTLINE);
-        cabin.setStrokeWidth(1.5);
-        cabin.setArcWidth(3);
-        cabin.setArcHeight(3);
+        cabin.setStrokeWidth(1.2);
 
-        // Hatch
-        Circle hatch = new Circle(2, HULL_DARK);
-        hatch.setStroke(OUTLINE);
-        hatch.setStrokeWidth(1);
+        Rectangle cabinTop = new Rectangle(9, 2);
+        cabinTop.setFill(HULL_TOP);
+        cabinTop.setStroke(OUTLINE);
+        cabinTop.setTranslateY(-5);
 
-        // Wings/stabilizers
-        Rectangle wingL = new Rectangle(7, 3);
-        wingL.setFill(HULL_MEDIUM);
-        wingL.setStroke(OUTLINE);
-        wingL.setStrokeWidth(1.2);
-        wingL.setTranslateX(-11);
-
-        Rectangle wingR = new Rectangle(7, 3);
-        wingR.setFill(HULL_MEDIUM);
-        wingR.setStroke(OUTLINE);
-        wingR.setStrokeWidth(1.2);
-        wingR.setTranslateX(11);
-
-        // Antenna
-        Line antenna = new Line(0, -6, 0, -10);
-        antenna.setStroke(OUTLINE);
-        antenna.setStrokeWidth(1.2);
-
-        Circle antennaTop = new Circle(1.5, HULL_DARK);
-        antennaTop.setStroke(OUTLINE);
-        antennaTop.setTranslateY(-10);
-
-        cell.getChildren().addAll(cabin, hatch, wingL, wingR, antenna, antennaTop);
+        cell.getChildren().addAll(bottom, hull, top, cabin, cabinTop);
     }
 
     private static void renderHit(StackPane cell, boolean hideShips, Object[] shipInfo) {
+        renderRealisticWater(cell);
+
         if (!hideShips && shipInfo != null) {
             String type = (String) shipInfo[0];
             int position = (int) shipInfo[1];
             int totalSize = (int) shipInfo[2];
             boolean isHorizontal = (boolean) shipInfo[3];
 
-            renderShipPart(cell, type, position, totalSize, isHorizontal);
+            renderShipPart3D(cell, type, position, totalSize, isHorizontal);
 
             Rectangle damage = new Rectangle(CELL_SIZE, CELL_SIZE);
-            damage.setFill(Color.rgb(0, 0, 0, 0.3));
+            damage.setFill(Color.rgb(0, 0, 0, 0.4));
             cell.getChildren().add(damage);
         }
 
-        Circle explosion = new Circle(11);
-        RadialGradient fireGradient = new RadialGradient(
+        Circle explosion = new Circle(12);
+        RadialGradient fire = new RadialGradient(
                 0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
                 new Stop(0, Color.YELLOW),
                 new Stop(0.4, Color.ORANGE),
                 new Stop(1, Color.DARKRED)
         );
-        explosion.setFill(fireGradient);
-        cell.getChildren().add(explosion);
+        explosion.setFill(fire);
 
-        Circle smoke = new Circle(7, Color.rgb(50, 50, 50, 0.7));
-        smoke.setTranslateY(-9);
-        cell.getChildren().add(smoke);
+        DropShadow explosionShadow = new DropShadow();
+        explosionShadow.setRadius(5);
+        explosionShadow.setColor(Color.rgb(255, 100, 0, 0.6));
+        explosion.setEffect(explosionShadow);
+
+        cell.getChildren().add(explosion);
     }
 
     private static void renderSunk(StackPane cell, Object[] shipInfo) {
-        Rectangle water = new Rectangle(CELL_SIZE, CELL_SIZE);
-        water.setFill(Color.rgb(30, 50, 70));
-        cell.getChildren().add(water);
+        renderRealisticWater(cell);
 
-        Polygon wreck = new Polygon(-8, -5, 8, -3, 6, 7, -10, 5);
-        wreck.setFill(Color.rgb(45, 50, 55));
-        wreck.setStroke(Color.rgb(25, 30, 35));
+        Polygon wreck = new Polygon(-8, -3, 8, -1, 6, 5, -10, 3);
+        wreck.setFill(Color.rgb(40, 45, 50));
+        wreck.setStroke(Color.rgb(20, 25, 30));
         wreck.setStrokeWidth(1.5);
         cell.getChildren().add(wreck);
 
-        Line x1 = new Line(-11, -11, 11, 11);
+        Line x1 = new Line(-12, -12, 12, 12);
         x1.setStroke(Color.DARKRED);
-        x1.setStrokeWidth(3.5);
+        x1.setStrokeWidth(4);
         x1.setStrokeLineCap(StrokeLineCap.ROUND);
 
-        Line x2 = new Line(11, -11, -11, 11);
+        Line x2 = new Line(12, -12, -12, 12);
         x2.setStroke(Color.DARKRED);
-        x2.setStrokeWidth(3.5);
+        x2.setStrokeWidth(4);
         x2.setStrokeLineCap(StrokeLineCap.ROUND);
 
         cell.getChildren().addAll(x1, x2);
     }
 
     private static void renderMiss(StackPane cell) {
-        Circle splash = new Circle(11, Color.rgb(200, 220, 255, 0.6));
-        splash.setStroke(Color.rgb(100, 150, 200));
+        renderRealisticWater(cell);
+
+        Circle splash = new Circle(12, Color.rgb(220, 240, 255, 0.7));
+        splash.setStroke(Color.rgb(180, 220, 250));
         splash.setStrokeWidth(2.5);
         cell.getChildren().add(splash);
 
-        Line x1 = new Line(-9, -9, 9, 9);
+        Line x1 = new Line(-10, -10, 10, 10);
         x1.setStroke(Color.WHITE);
-        x1.setStrokeWidth(3.5);
+        x1.setStrokeWidth(4);
         x1.setStrokeLineCap(StrokeLineCap.ROUND);
 
-        Line x2 = new Line(9, -9, -9, 9);
+        Line x2 = new Line(10, -10, -10, 10);
         x2.setStroke(Color.WHITE);
-        x2.setStrokeWidth(3.5);
+        x2.setStrokeWidth(4);
         x2.setStrokeLineCap(StrokeLineCap.ROUND);
+
+        DropShadow missShadow = new DropShadow();
+        missShadow.setRadius(3);
+        missShadow.setColor(Color.rgb(255, 255, 255, 0.5));
+        x1.setEffect(missShadow);
+        x2.setEffect(missShadow);
 
         cell.getChildren().addAll(x1, x2);
     }
