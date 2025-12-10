@@ -64,6 +64,26 @@ public class Board implements Serializable {
             ship.addCoordinate(newCoord); // Agregar coord al objeto barco
         }
     }
+    public Object[] getShipRenderInfo(Coordinate coord) {
+        Ship ship = shipPlacement.get(coord);
+        if (ship == null) return null;
+
+        String type = ship.getType();
+        int position = ship.getCoordinates().indexOf(coord);
+        int size = ship.getSize();
+        boolean isHorizontal = isShipHorizontal(ship);
+
+        return new Object[]{type, position, size, isHorizontal};
+    }
+
+    private boolean isShipHorizontal(Ship ship) {
+        if (ship.getCoordinates().size() < 2) return true;
+
+        Coordinate first = ship.getCoordinates().get(0);
+        Coordinate second = ship.getCoordinates().get(1);
+
+        return first.getRow() == second.getRow();
+    }
 
     public Map<Coordinate, CellState> getGrid() { return grid; }
     public Map<Coordinate, Ship> getShipPlacement() { return shipPlacement; }
