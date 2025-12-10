@@ -113,6 +113,7 @@ public class GameController implements IBattleShipGame {
 
     /**
      * Sets the AI difficulty level.
+     * IMPROVED: Resets strategy state when changing difficulty.
      *
      * @param difficulty "EASY", "MEDIUM", or "HARD"
      */
@@ -120,12 +121,15 @@ public class GameController implements IBattleShipGame {
         switch (difficulty.toUpperCase()) {
             case "EASY":
                 shootingStrategy = new com.example.battleship.patterns.RandomStrategy();
+                System.out.println("🟢 AI Difficulty: EASY (Random shooting)");
                 break;
             case "MEDIUM":
                 shootingStrategy = new com.example.battleship.patterns.SmartStrategy();
+                System.out.println("🟡 AI Difficulty: MEDIUM (Targets after hit)");
                 break;
             case "HARD":
                 shootingStrategy = new com.example.battleship.patterns.HuntTargetStrategy();
+                System.out.println("🔴 AI Difficulty: HARD (Hunt & Target - Aggressive pursuit)");
                 break;
             default:
                 shootingStrategy = new com.example.battleship.patterns.RandomStrategy();
@@ -242,6 +246,7 @@ public class GameController implements IBattleShipGame {
 
     /**
      * Starts the machine's turn in a separate thread.
+     * IMPROVED: Now notifies the AI strategy about hits and sinks.
      */
     private void startMachineTurn() {
         Thread machineThread = new Thread(() -> {
@@ -259,6 +264,23 @@ public class GameController implements IBattleShipGame {
                     }
 
                     boolean hit = processShot(playerBoard, target);
+
+                    // IMPROVED: Notify AI about the result
+                    if (hit) {
+                        Ship ship = playerBoard.getShipPlacement().get(target);
+                        boolean isSunk = ship != null && ship.isSunk();
+
+                        // Notify strategy about the hit
+                        if (shootingStrategy instanceof com.example.battleship.patterns.HuntTargetStrategy) {
+                            ((com.example.battleship.patterns.HuntTargetStrategy) shootingStrategy).registerHit(target);
+
+                            if (isSunk && ship != null) {
+                                ((com.example.battleship.patterns.HuntTargetStrategy) shootingStrategy).registerSunk(ship.getCoordinates());
+                            }
+                        } else if (shootingStrategy instanceof com.example.battleship.patterns.SmartStrategy) {
+                            ((com.example.battleship.patterns.SmartStrategy) shootingStrategy).registerHit(target);
+                        }
+                    }
 
                     // Notify observers
                     Ship ship = playerBoard.getShipPlacement().get(target);
